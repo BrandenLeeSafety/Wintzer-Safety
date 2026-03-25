@@ -53,9 +53,9 @@ const locations=[
   {area:'South Warehouse',subs:[]}
 ];
 function qrSrc(area,sub){
-  let url=BASE+'?area='+encodeURIComponent(area);
-  if(sub)url+='&sub='+encodeURIComponent(sub);
-  return'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='+encodeURIComponent(url);
+  let url=BASE+'?area='+area.replace(/ /g,'%20');
+  if(sub)url+='&sub='+sub.replace(/ /g,'%20');
+  return'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='+url.replace(/ /g,'%20');
 }
 function card(area,sub){
   const src=qrSrc(area,sub);
