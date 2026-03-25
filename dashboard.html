@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wintzer Safety — Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --black: #0e0e0e;
+    --steel: #1c1f24;
+    --panel: #242830;
+    --border: #333840;
+    --accent: #e8a020;
+    --danger: #d94040;
+    --warn: #e8a020;
+    --safe: #3a9e6e;
+    --blue: #3a7ae8;
+    --text: #e8e8e8;
+    --muted: #8a909a;
+    --input-bg: #181b20;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--black); color: var(--text); font-family: 'IBM Plex Sans', sans-serif; font-size: 14px; min-height: 100vh; }
+
+  /* HEADER */
+  .header {
+    background: var(--steel);
+    border-bottom: 3px solid var(--accent);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header h1 { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 2px; color: #fff; }
+  .header p { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--accent); letter-spacing: 1.5px; text-transform: uppercase; }
+
+  /* STATS BAR */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .stat {
+    background: var(--steel);
+    padding: 14px 16px;
+    text-align: center;
+  }
+  .stat-num { font-family: 'Bebas Neue', sans-serif; font-size: 28px; line-height: 1; }
+  .stat-label { font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-top: 2px; }
+  .stat-num.open { color: var(--danger); }
+  .stat-num.progress { color: var(--accent); }
+  .stat-num.closed { color: var(--safe); }
+  .stat-num.total { color: var(--text); }
+
+  /* FILTERS */
+  .filters {
+    padding: 12px 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .filter-btn {
+    background: var(--input-bg);
+    border: 1.5px solid var(--border);
+    color: var(--muted);
+    padding: 6px 14px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .filter-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(232,160,32,0.08); }
+
+  /* REPORT LIST */
+  .report-list { padding: 12px 16px; }
+  .loading { text-align: center; padding: 60px 20px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 1px; }
+
+  .report-card {
+    background: var(--steel);
+    border: 1.5px solid var(--border);
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .report-card:active { border-color: var(--accent); }
+  .report-card-header {
+    padding: 12px 14px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .report-type-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border: 1px solid;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .badge-near-miss { border-color: var(--safe); color: var(--safe); }
+  .badge-hazard { border-color: var(--accent); color: var(--accent); }
+  .badge-incident { border-color: var(--danger); color: var(--danger); }
+
+  .report-main { flex: 1; min-width: 0; }
+  .report-location { font-weight: 600; font-size: 14px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .report-desc { color: var(--muted); font-size: 12px; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .report-meta { display: flex; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
+  .report-meta span { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); }
+
+  .sev-dot {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .sev-1 { background: rgba(58,158,110,0.2); color: #5ec99a; border: 1.5px solid #3a9e6e; }
+  .sev-2 { background: rgba(126,196,58,0.2); color: #9ed45a; border: 1.5px solid #7ec43a; }
+  .sev-3 { background: rgba(232,160,32,0.2); color: var(--accent); border: 1.5px solid var(--accent); }
+  .sev-4 { background: rgba(217,64,64,0.2); color: #f07070; border: 1.5px solid var(--danger); }
+
+  .status-bar {
+    padding: 6px 14px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .status-pill {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 2px;
+  }
+  .status-open { background: rgba(217,64,64,0.15); color: #f07070; }
+  .status-progress { background: rgba(232,160,32,0.15); color: var(--accent); }
+  .status-closed { background: rgba(58,158,110,0.15); color: #5ec99a; }
+  .days-open { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); }
+
+  /* DETAIL MODAL */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 200;
+    overflow-y: auto;
+  }
+  .modal-overlay.visible { display: block; }
+  .modal {
+    background: var(--steel);
+    margin: 16px;
+    border: 1.5px solid var(--border);
+    border-top: 3px solid var(--accent);
+  }
+  .modal-header {
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-header h2 { font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 1.5px; }
+  .modal-close {
+    background: none; border: none; color: var(--muted);
+    font-size: 22px; cursor: pointer; padding: 4px 8px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .modal-body { padding: 16px; }
+
+  .detail-row { margin-bottom: 14px; }
+  .detail-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+  .detail-value { font-size: 14px; color: var(--text); line-height: 1.5; }
+  .detail-value.muted { color: var(--muted); font-style: italic; }
+
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+  .edit-input, .edit-select {
+    width: 100%;
+    background: var(--input-bg);
+    border: 1.5px solid var(--border);
+    color: var(--text);
+    padding: 10px 12px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px;
+    outline: none;
+    border-radius: 0;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  .edit-input:focus, .edit-select:focus { border-color: var(--accent); }
+  .edit-select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238a909a' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+    cursor: pointer;
+  }
+  .edit-select option { background: var(--panel); }
+
+  .save-btn {
+    width: 100%;
+    background: var(--accent);
+    color: var(--black);
+    border: none;
+    padding: 14px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    margin-top: 20px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .save-btn:active { opacity: 0.85; }
+  .save-btn:disabled { background: var(--border); color: var(--muted); }
+
+  .photos-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 6px; }
+  .photos-grid img { width: 100%; aspect-ratio: 1; object-fit: cover; cursor: pointer; }
+
+  .divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+  .section-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty p { font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div>
+    <h1>Safety Dashboard</h1>
+    <p>G.A. Wintzer & Son Co.</p>
+  </div>
+  <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);text-align:right;">
+    <div id="lastRefresh"></div>
+    <div style="margin-top:4px;cursor:pointer;color:var(--accent);" onclick="loadReports()">↻ Refresh</div>
+  </div>
+</header>
+
+<div class="stats-bar">
+  <div class="stat"><div class="stat-num total" id="statTotal">—</div><div class="stat-label">Total</div></div>
+  <div class="stat"><div class="stat-num open" id="statOpen">—</div><div class="stat-label">Open</div></div>
+  <div class="stat"><div class="stat-num progress" id="statProgress">—</div><div class="stat-label">In Progress</div></div>
+  <div class="stat"><div class="stat-num closed" id="statClosed">—</div><div class="stat-label">Closed</div></div>
+</div>
+
+<div class="filters">
+  <button class="filter-btn active" onclick="setFilter('all', this)">All</button>
+  <button class="filter-btn" onclick="setFilter('Open', this)">Open</button>
+  <button class="filter-btn" onclick="setFilter('In Progress', this)">In Progress</button>
+  <button class="filter-btn" onclick="setFilter('Closed', this)">Closed</button>
+  <button class="filter-btn" onclick="setFilter('Incident', this)">Incidents</button>
+  <button class="filter-btn" onclick="setFilter('Hazard', this)">Hazards</button>
+  <button class="filter-btn" onclick="setFilter('Near Miss', this)">Near Misses</button>
+</div>
+
+<div class="report-list" id="reportList">
+  <div class="loading">LOADING REPORTS...</div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <h2 id="modalTitle">Report Detail</h2>
+      <button class="modal-close" onclick="closeModalDirect()">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://cjhczrrtvhkrraiwhkru.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNqaGN6cnJ0dmhrcnJhaXdoa3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0MTIzODgsImV4cCI6MjA4OTk4ODM4OH0.178PltusEubWspJvTP2CpwgAlYg0QQyufp-0tfR5gjw';
+
+let allReports = [];
+let currentFilter = 'all';
+let currentReport = null;
+
+async function loadReports() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/reports?order=created_at.desc`, {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      }
+    });
+    allReports = await res.json();
+    updateStats();
+    renderReports();
+    document.getElementById('lastRefresh').textContent = 'Updated ' + new Date().toLocaleTimeString();
+  } catch(e) {
+    document.getElementById('reportList').innerHTML = '<div class="loading">Failed to load. Check connection.</div>';
+  }
+}
+
+function updateStats() {
+  document.getElementById('statTotal').textContent = allReports.length;
+  document.getElementById('statOpen').textContent = allReports.filter(r => (r.status || 'Open') === 'Open').length;
+  document.getElementById('statProgress').textContent = allReports.filter(r => r.status === 'In Progress').length;
+  document.getElementById('statClosed').textContent = allReports.filter(r => r.status === 'Closed').length;
+}
+
+function setFilter(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderReports();
+}
+
+function renderReports() {
+  let filtered = allReports;
+  if (currentFilter !== 'all') {
+    filtered = allReports.filter(r => {
+      if (['Open','In Progress','Closed'].includes(currentFilter)) return (r.status || 'Open') === currentFilter;
+      return r.report_type === currentFilter;
+    });
+  }
+
+  const list = document.getElementById('reportList');
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="empty"><p>NO REPORTS FOUND</p></div>';
+    return;
+  }
+
+  list.innerHTML = filtered.map(r => {
+    const status = r.status || 'Open';
+    const statusClass = status === 'Open' ? 'status-open' : status === 'In Progress' ? 'status-progress' : 'status-closed';
+    const typeClass = r.report_type === 'Near Miss' ? 'badge-near-miss' : r.report_type === 'Hazard' ? 'badge-hazard' : 'badge-incident';
+    const sevClass = 'sev-' + (r.severity || '1');
+    const location = [r.area, r.sub_area].filter(Boolean).join(' › ');
+    const date = new Date(r.created_at).toLocaleDateString();
+    const daysOpen = r.status === 'Closed' && r.date_closed
+      ? Math.round((new Date(r.date_closed) - new Date(r.created_at)) / 86400000)
+      : Math.round((Date.now() - new Date(r.created_at)) / 86400000);
+
+    return `<div class="report-card" onclick="openReport('${r.id}')">
+      <div class="report-card-header">
+        <div class="sev-dot ${sevClass}">${r.severity || '?'}</div>
+        <div class="report-main">
+          <div class="report-location">${location || 'Unknown Location'}</div>
+          <div class="report-desc">${r.description || ''}</div>
+          <div class="report-meta">
+            <span>${date}</span>
+            ${r.assigned_to ? `<span>→ ${r.assigned_to}</span>` : ''}
+            ${r.anonymous ? '<span>ANON</span>' : (r.contact_name ? `<span>${r.contact_name}</span>` : '')}
+          </div>
+        </div>
+        <span class="report-type-badge ${typeClass}">${r.report_type || '?'}</span>
+      </div>
+      <div class="status-bar">
+        <span class="status-pill ${statusClass}">${status}</span>
+        <span class="days-open">${daysOpen}d open</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openReport(id) {
+  currentReport = allReports.find(r => r.id === id);
+  if (!currentReport) return;
+  const r = currentReport;
+
+  const status = r.status || 'Open';
+  const location = [r.area, r.sub_area, r.specific_spot].filter(Boolean).join(' › ');
+  const submitted = new Date(r.created_at).toLocaleString();
+  const daysOpen = r.status === 'Closed' && r.date_closed
+    ? Math.round((new Date(r.date_closed) - new Date(r.created_at)) / 86400000)
+    : Math.round((Date.now() - new Date(r.created_at)) / 86400000);
+
+  document.getElementById('modalTitle').textContent = `${r.report_type || 'Report'} — Sev ${r.severity || '?'}`;
+
+  let photosHTML = '';
+  if (r.photo_urls && r.photo_urls.length > 0) {
+    photosHTML = `<div class="detail-row">
+      <div class="detail-label">Photos</div>
+      <div class="photos-grid">${r.photo_urls.map(url => `<img src="${url}" onclick="window.open('${url}')" />`).join('')}</div>
+    </div><div class="divider"></div>`;
+  }
+
+  document.getElementById('modalBody').innerHTML = `
+    <div class="detail-row">
+      <div class="detail-label">Location</div>
+      <div class="detail-value">${location || '—'}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Description</div>
+      <div class="detail-value">${r.description || '—'}</div>
+    </div>
+    <div class="detail-grid">
+      <div class="detail-row">
+        <div class="detail-label">Submitted</div>
+        <div class="detail-value">${submitted}</div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-label">Incident Time</div>
+        <div class="detail-value">${r.incident_datetime ? new Date(r.incident_datetime).toLocaleString() : '—'}</div>
+      </div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Reporter</div>
+      <div class="detail-value ${r.anonymous ? 'muted' : ''}">${r.anonymous ? 'Anonymous' : (r.contact_name || '—')}${!r.anonymous && r.contact_info ? ' · ' + r.contact_info : ''}</div>
+    </div>
+    ${photosHTML}
+    <div class="divider"></div>
+    <div class="section-title">Case Management</div>
+    <div class="detail-row">
+      <div class="detail-label">Status</div>
+      <select class="edit-select" id="editStatus">
+        <option ${status === 'Open' ? 'selected' : ''}>Open</option>
+        <option ${status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+        <option ${status === 'Closed' ? 'selected' : ''}>Closed</option>
+      </select>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Assigned To</div>
+      <input class="edit-input" id="editAssigned" type="text" placeholder="Enter name..." value="${r.assigned_to || ''}">
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Verified By</div>
+      <input class="edit-input" id="editVerified" type="text" placeholder="Enter name..." value="${r.verified_by || ''}">
+    </div>
+    <div class="detail-grid">
+      <div class="detail-row">
+        <div class="detail-label">Days Open</div>
+        <div class="detail-value">${daysOpen} day${daysOpen !== 1 ? 's' : ''}</div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-label">Date Closed</div>
+        <div class="detail-value">${r.date_closed ? new Date(r.date_closed).toLocaleDateString() : '—'}</div>
+      </div>
+    </div>
+    <button class="save-btn" onclick="saveReport()">SAVE CHANGES</button>
+  `;
+
+  document.getElementById('modalOverlay').classList.add('visible');
+}
+
+async function saveReport() {
+  if (!currentReport) return;
+  const btn = document.querySelector('.save-btn');
+  btn.disabled = true;
+  btn.textContent = 'SAVING...';
+
+  const newStatus = document.getElementById('editStatus').value;
+  const wasOpen = currentReport.status !== 'Closed';
+  const nowClosed = newStatus === 'Closed';
+
+  const updates = {
+    status: newStatus,
+    assigned_to: document.getElementById('editAssigned').value.trim() || null,
+    verified_by: document.getElementById('editVerified').value.trim() || null,
+    date_closed: (wasOpen && nowClosed) ? new Date().toISOString() : (newStatus !== 'Closed' ? null : currentReport.date_closed)
+  };
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/reports?id=eq.${currentReport.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify(updates)
+    });
+
+    if (res.ok) {
+      Object.assign(currentReport, updates);
+      await loadReports();
+      closeModalDirect();
+    } else {
+      const err = await res.text();
+      alert('Save failed: ' + err);
+      btn.disabled = false;
+      btn.textContent = 'SAVE CHANGES';
+    }
+  } catch(e) {
+    alert('Error: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = 'SAVE CHANGES';
+  }
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('modalOverlay')) closeModalDirect();
+}
+function closeModalDirect() {
+  document.getElementById('modalOverlay').classList.remove('visible');
+  currentReport = null;
+}
+
+// Need to allow updates in Supabase - enable RLS for updates too
+loadReports();
+</script>
+</body>
+</html>
